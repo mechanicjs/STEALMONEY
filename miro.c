@@ -1,92 +1,117 @@
+//compile: cc miro.c -o miro -lcurses -lpthread
+
 #include <stdio.h>
 #include <unistd.h>
 #include <termio.h>
 #include <curses.h>
-/*char Fgetch(){
-	struct termios oldt,newt;
-	char ch;
-	tcgetattr(STDIN_FILENO,&oldt);
-	newt=oldt;
-	newt.c_lflag&=~(ICANON|ECHO);
-	tcsetattr(STDIN_FILENO,TCSANOW,&newt);
-	ch=getchar();
-	tcsetattr(STDIN_FILENO,TCSANOW,&oldt);
-	return ch;
-}*/
+#include <stdlib.h>
+#include <pthread.h>
+
+#define ROW 15
+#define COL 26
+
+#define WALL 'X'
+#define TREASURE '$'
+
+#define TIMER_ROW 3
+#define TIMER_COL 30
+#define LIMIT 10
+
+int limit=30;
+
+void* show_timer(void* m){
+	for(limit;limit>=0;limit--){
+		move(TIMER_ROW,TIMER_COL);
+		addch('0'+limit/10);
+		addch('0'+limit%10);
+		refresh();
+		sleep(1);
+	}
+	return NULL;
+}
+
 int main(){
 	char input;
+	int cur_row=0;
+	int cur_col=1;
+	char* star="O";
+  char* blank=" ";
+	pthread_t t1;
+
+
 	initscr();
 	clear();
-	int cur_row=0;
-	int cur_col=0;
-	char* star="wow";
-  char blank=' ';
+	noecho();
+	curs_set(0);
 
-struct termios info;
-tcgetattr(0, &info);
+	FILE*fp=fopen("map.txt","r");
+	if(!fp){
+		printf("FILE cannot be opened\n");
+		exit(1);
+	}
 
-
-	info.c_lflag &= ~ECHO;		/* turn off bit */
-
- tcsetattr(0, TCSANOW, &info);	/* set attribs */
-
+	char miro[ROW][COL];
+	for(int i=0;i<ROW;i++){
+		fgets(miro[i],COL,fp);
+		move(i,0);
+		addstr(miro[i]);
+	}
+	fclose(fp);
 
 	move(cur_row,cur_col);
 	addstr(star);
 	refresh();
 
+	pthread_create(&t1,NULL,show_timer,NULL);
+
 	while((input=getch())!='q'){
-		//printf("input is %d\n",input);
 		if(input==27){
 			getch();
 			input=getch();
 			switch(input){
-				case 65:
-				//dowm
-				//printf("key is down\n");
-				move(cur_row,cur_col);
-					addch(blank);
-					cur_row-=1;
-					move(cur_row,cur_col);
-					addstr(star);
-          refresh();
-					break;
-				case 66:
-				//up
-				//printf("key is up\n");
-				move(cur_row,cur_col);
-				addch(blank);
-				cur_row+=1;
-				move(cur_row,cur_col);
-				addstr(star);
-				refresh();
-					break;
+				case 65://down
+						if(miro[cur_row-1][cur_col]==WALL) break;
+						move(cur_row,cur_col);
+						addstr(blank);
+						cur_row-=1;
+						move(cur_row,cur_col);
+						addstr(star);
+						refresh();
+						break;
+				case 66://up
+						if(miro[cur_row+1][cur_col]==WALL) break;
+						move(cur_row,cur_col);
+						addstr(blank);
+						cur_row+=1;
+						move(cur_row,cur_col);
+						addstr(star);
+						refresh();
+						break;
 				case 68: //left
-					//printf("key is left\n");
-					move(cur_row,cur_col);
-					addch(blank);
-					cur_col-=1;
-					move(cur_row,cur_col);
-				addstr(star);
-            refresh();
+						if(miro[cur_row][cur_col-1]==WALL) break;
+						move(cur_row,cur_col);
+						addstr(blank);
+						cur_col-=1;
+						move(cur_row,cur_col);
+						addstr(star);
+						refresh();
 						break;
 				case 67: //right
-				//printf("key is right\n");
-				move(cur_row,cur_col);
-					addch(blank);
+					if(miro[cur_row][cur_col+1]==WALL) break;
+					move(cur_row,cur_col);
+					addstr(blank);
 					cur_col+=1;
-				move(cur_row,cur_col);
-				addstr(star);
-	       refresh();
-					break;
+					move(cur_row,cur_col);
+					addstr(star);
+					refresh();
 			}
-
+			if(miro[cur_row][cur_col]==TREASURE){
+				limit=0;
+				printf(" < YEAH!!!!!\n");
+			}
 		}
-
 	}
-	endwin();
 
-	info.c_lflag |= ECHO;		/* turn on bit */
- tcsetattr(0, TCSANOW, &info);	/* set attribs */
+	endwin();
 	return 0;
 }
